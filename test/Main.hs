@@ -1,4 +1,11 @@
 module Main (main) where
 
+import JsonParserTest
+import Test.Hspec
+
 main :: IO ()
-main = putStrLn "Test suite not yet implemented."
+main = hspec $ do
+  parseCharTest
+  parseStringTest
+  jsonNullTest
+  jsonBoolTest

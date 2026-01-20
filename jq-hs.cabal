@@ -108,7 +108,7 @@ test-suite jq-hs-test
     default-language: Haskell2010
 
     -- Modules included in this executable, other than Main.
-    -- other-modules:
+    other-modules: JsonParserTest, ParserTest
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -126,4 +126,5 @@ test-suite jq-hs-test
     build-depends:
         base ^>=4.21.0.0,
         hspec,
+        containers,
         jq-hs

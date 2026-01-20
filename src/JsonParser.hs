@@ -1,10 +1,12 @@
-module JsonParser (JsonValue (..), jsonBool, jsonNull, jsonNumber) where
+module JsonParser (JsonValue (..), jsonBool, jsonNull, jsonNumber, jsonArray, jsonString, jsonObject, json) where
 
 import Control.Applicative (Alternative ((<|>)))
-import Data.Char (isDigit)
+import Control.Monad (replicateM)
+import Data.Char (chr, isDigit, isHexDigit, ord)
 import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map (fromList)
 import Data.Maybe (fromMaybe)
-import Parser (Parser (..), many, notFollowedBy, optional, parseChar, parseString, satisfy, some)
+import Parser (Parser (..), between, eof, lexeme, many, notFollowedBy, optional, parseChar, parseWhitespace, satisfy, sepBy, some, symbol)
 
 -- | Top-level JSON elements
 data JsonValue
@@ -17,16 +19,39 @@ data JsonValue
   | JsonNull
   deriving (Show, Eq)
 
+-- | Parser for a json
+json :: Parser JsonValue
+json = parseWhitespace *> jsonValue <* eof
+
+-- | Parser for a json value
+jsonValue :: Parser JsonValue
+jsonValue = lexeme $ jsonObject <|> jsonArray <|> jsonNumber <|> jsonBool <|> jsonNull <|> jsonString
+
+-- | Parser for a json object
+jsonObject :: Parser JsonValue
+jsonObject = between (symbol "{") (symbol "}") (JsonObject . Map.fromList <$> sepBy parsePair (symbol ","))
+  where
+    parsePair :: Parser (String, JsonValue)
+    parsePair = (\key _ value -> (key, value)) <$> lexeme stringLiteral <*> symbol ":" <*> jsonValue
+
+-- | Parser for a json array
+jsonArray :: Parser JsonValue
+jsonArray = between (symbol "[") (symbol "]") arrayElements
+  where
+    -- Parse comma-separated json values
+    arrayElements :: Parser JsonValue
+    arrayElements = JsonArray <$> sepBy jsonValue (symbol ",")
+
 -- | Parser for a null value
 jsonNull :: Parser JsonValue
-jsonNull = JsonNull <$ parseString "null"
+jsonNull = JsonNull <$ symbol "null"
 
 -- | Parser for a boolean value
 jsonBool :: Parser JsonValue
 jsonBool = boolTrue <|> boolFalse
   where
     parseBool :: String -> Bool -> Parser JsonValue
-    parseBool str value = JsonBool value <$ parseString str
+    parseBool str value = JsonBool value <$ symbol str
 
     boolTrue = parseBool "true" True
     boolFalse = parseBool "false" False
@@ -79,3 +104,40 @@ jsonNumber = (JsonDouble <$> parseDouble) <|> (JsonInteger <$> parseInteger)
     -- Parse a digit
     digit :: Parser Char
     digit = satisfy isDigit
+
+-- | Parser for a json string
+jsonString :: Parser JsonValue
+jsonString = JsonString <$> stringLiteral
+
+-- | Parser for a json string literal
+stringLiteral :: Parser String
+stringLiteral = between (parseChar '"') (parseChar '"') (many (parseEscapeHex <|> parseEscapeCharacter <|> satisfy validChar))
+  where
+    -- Validate a character
+    validChar :: Char -> Bool
+    validChar chr' =
+      let code = ord chr'
+       in code >= 0x0020 && code <= 0x10FFF && chr' /= '"' && chr' /= '\\'
+
+    -- Parse escape values
+    parseEscapeCharacter :: Parser Char
+    parseEscapeCharacter =
+      parseChar '\\'
+        *> ( '"' <$ parseChar '"'
+               <|> '\\' <$ parseChar '\\'
+               <|> '/' <$ parseChar '/'
+               <|> '\b' <$ parseChar 'b'
+               <|> '\f' <$ parseChar 'f'
+               <|> '\n' <$ parseChar 'n'
+               <|> '\r' <$ parseChar 'r'
+               <|> '\t' <$ parseChar 't'
+           )
+
+    -- Parse hex value
+    parseEscapeHex :: Parser Char
+    parseEscapeHex = do
+      _ <- parseChar '\\'
+      _ <- parseChar 'u'
+      digits <- replicateM 4 (satisfy isHexDigit)
+      let code = read ("0x" ++ digits)
+      pure (chr code)

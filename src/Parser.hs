@@ -10,10 +10,18 @@ module Parser
     optional,
     notFollowedBy,
     satisfy,
+    sepBy,
+    sepBy1,
+    lexeme,
+    parseWhitespace,
+    symbol,
+    between,
+    eof
   )
 where
 
 import Control.Applicative (Alternative (empty, (<|>)))
+import Control.Monad (void)
 import Text.Printf (printf)
 
 -- | Generic parser type
@@ -122,7 +130,13 @@ parseSpan ::
 parseSpan predicate =
   Parser $ \input line column ->
     let (token, rest) = span predicate input
-     in Right (rest, line, column + length token, token)
+        (line', column') = foldl update (line, column) token
+     in Right (rest, line', column', token)
+  where
+    update :: (Int, Int) -> Char -> (Int, Int)
+    update (line', column') chr = case chr of
+      '\n' -> (line' + 1, column')
+      _ -> (line', column' + 1)
 
 -- | Parses zero or more elements that successfully executes the parser
 many :: Parser a -> Parser [a]
@@ -145,8 +159,44 @@ notFollowedBy (Parser runParser') = Parser $ \input line col ->
 
 -- | Parse a character that matches the predicate
 satisfy :: (Char -> Bool) -> Parser Char
-satisfy predicate = Parser $ \input line col ->
+satisfy predicate = Parser $ \input line column ->
   case input of
-    (chr : cs) | predicate chr -> Right (cs, line, col + 1, chr)
-    (chr : _) -> Left (line, col, printf "Unexpected '%c'" chr)
-    [] -> Left (line, col, "Unexpected end of input")
+    (chr : cs)
+      | predicate chr ->
+          let (line', column') = case chr of
+                '\n' -> (line + 1, 1)
+                _ -> (line, column + 1)
+           in Right (cs, line', column', chr)
+    (chr : _) -> Left (line, column, printf "Unexpected '%c'" chr)
+    [] -> Left (line, column, "Unexpected end of input")
+
+-- | Parse one or more occurrences of `parser` separated by `separator`
+sepBy1 :: Parser a -> Parser sep -> Parser [a]
+sepBy1 parser separator = (:) <$> parser <*> many (separator *> parser)
+
+-- | Parse zero or more occurrences of `parser` separated by `separator`
+sepBy :: Parser a -> Parser sep -> Parser [a]
+sepBy parser separator = sepBy1 parser separator <|> pure []
+
+-- | Parse an element that is enclosed in two other parsers' elements
+between :: Parser open -> Parser close -> Parser a -> Parser a
+between open close p = open *> p <* close
+
+-- | Parse a whitespace (space, tab, new line, carriage return)
+parseWhitespace :: Parser ()
+parseWhitespace = void (many (satisfy (`elem` (" \t\n\r" :: [Char]))))
+
+-- | Execute a parser that can end with whitespaces
+lexeme :: Parser a -> Parser a
+lexeme parser = parser <* parseWhitespace
+
+-- | Parse a string that can end with whitespaces
+symbol :: String -> Parser String
+symbol = lexeme . parseString
+
+-- | Ensure there is no more input (EOF)
+eof :: Parser ()
+eof = Parser $ \input line col ->
+  case input of
+    [] -> Right ([], line, col, ())
+    _  -> Left (line, col, "Expected end of input")

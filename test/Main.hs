@@ -1,8 +1,26 @@
 module Main (main) where
 
-import ParserTest
 import JsonParserTest
-import Test.Hspec
+  ( jsonArrayTest,
+    jsonBoolTest,
+    jsonNullTest,
+    jsonNumberTest,
+    jsonObjectTest,
+    jsonStringTest,
+  )
+import ParserTest
+  ( manyTest,
+    notFollowedByTest,
+    optionalTest,
+    parseCharTest,
+    parseSpanTest,
+    parseStringTest,
+    satisfyTest,
+    sepBy1Test,
+    sepByTest,
+    someTest,
+  )
+import Test.Hspec (hspec)
 
 main :: IO ()
 main = hspec $ do
@@ -15,7 +33,12 @@ main = hspec $ do
   optionalTest
   notFollowedByTest
   satisfyTest
+  sepByTest
+  sepBy1Test
   -- json parse test
   jsonNullTest
   jsonBoolTest
   jsonNumberTest
+  jsonArrayTest
+  jsonStringTest
+  jsonObjectTest

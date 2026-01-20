@@ -1,7 +1,7 @@
 module ParserTest where
 
 import Data.Char (isDigit, isLower)
-import Parser (Parser (..), many, optional, parseChar, parseSpan, parseString, satisfy, some, notFollowedBy, satisfy)
+import Parser (Parser (..), many, notFollowedBy, optional, parseChar, parseSpan, parseString, satisfy, sepBy, sepBy1, some)
 import Test.Hspec
 
 parseCharTest :: Spec
@@ -75,7 +75,7 @@ optionalTest = do
   describe "optional test" $ do
     it "should parse an existing character" $
       runParser (optional $ parseChar 'a') "abc" 1 1 `shouldBe` Right ("bc", 1, 2, Just 'a')
-    
+
     it "should return Nothing on a non-existing character" $
       runParser (optional $ parseChar 'a') "bbc" 1 1 `shouldBe` Right ("bbc", 1, 1, Nothing)
 
@@ -93,3 +93,21 @@ satisfyTest = do
   describe "satisfy test" $
     it "should parse a digit" $ do
       runParser (satisfy isDigit) "1" 1 1 `shouldBe` Right ("", 1, 2, '1')
+
+sepByTest :: Spec
+sepByTest = do
+  describe "sepBy test" $ do
+    it "should parse a comma-separated list of numbers" $
+      runParser (sepBy (satisfy isDigit) (parseChar ',')) "1,2,3,4" 1 1 `shouldBe` Right ("", 1, 8, ['1', '2', '3', '4'])
+
+    it "should not fail if it doesn't parse" $
+      runParser (sepBy (satisfy isDigit) (parseChar ',')) ",2,3,4" 1 1 `shouldBe` Right (",2,3,4", 1, 1, "")
+
+sepBy1Test :: Spec
+sepBy1Test = do
+  describe "sepBy1 test" $ do
+    it "should parse a comma-separated list of numbers" $
+      runParser (sepBy1 (satisfy isDigit) (parseChar ',')) "1,2,3,4" 1 1 `shouldBe` Right ("", 1, 8, ['1', '2', '3', '4'])
+
+    it "should fail if it doesn't parse" $
+      runParser (sepBy1 (satisfy isDigit) (parseChar ',')) ",2,3,4" 1 1 `shouldBe` Left (1, 1, "Unexpected ','")

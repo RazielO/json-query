@@ -1,34 +1,8 @@
 module JsonParserTest where
 
-import JsonParser (JsonValue (..), Parser (..), jsonBool, jsonNull, parseChar, parseString)
+import Parser (Parser (..))
+import JsonParser (JsonValue (..), jsonBool, jsonNull, jsonNumber)
 import Test.Hspec
-
-parseCharTest :: Spec
-parseCharTest = do
-  describe "parseChar Test" $ do
-    it "should parse a character" $ do
-      runParser (parseChar 'a') "a" 1 1 `shouldBe` Right ("", 1, 2, 'a')
-
-    it "should fail if character is different" $ do
-      runParser (parseChar 'a') "b" 1 1 `shouldBe` Left (1, 1, "Expected 'a' but got 'b' on line 1:1.")
-
-    it "should fail on empty string" $ do
-      runParser (parseChar 'a') "" 1 1 `shouldBe` Left (1, 1, "Expected 'a' but got empty string on line 1:1.")
-
-parseStringTest :: Spec
-parseStringTest = do
-  describe "parseString Test" $ do
-    it "should parse a string" $ do
-      runParser (parseString "hello") "hello world" 1 1 `shouldBe` Right (" world", 1, 6, "hello")
-
-    it "should fail if string doesn't match. Different character." $ do
-      runParser (parseString "hello") "hollo world" 1 1 `shouldBe` Left (1, 1, "Expected \"hello\" but got \"hollo\" on line 1:1")
-
-    it "should fail if string doesn't match. Shorter string." $ do
-      runParser (parseString "hello") "hell world" 1 1 `shouldBe` Left (1, 1, "Expected \"hello\" but got \"hell \" on line 1:1")
-
-    it "should fail on empty string." $ do
-      runParser (parseString "hello") "" 1 1 `shouldBe` Left (1, 1, "Expected \"hello\" but got empty string on line 1:1")
 
 jsonNullTest :: Spec
 jsonNullTest = do
@@ -56,3 +30,31 @@ jsonBoolTest = do
 
     it "should fail on empty string" $ do
       runParser jsonBool "" 1 1 `shouldBe` Left (1, 1, "Expected \"true\" but got empty string on line 1:1")
+
+jsonNumberTest :: Spec
+jsonNumberTest = do
+  describe "jsonNumber Test" $ do
+    it "should parse valid integers" $ do
+      runParser jsonNumber "0" 1 1 `shouldBe` Right ("", 1, 2, JsonInteger 0)
+      runParser jsonNumber "5" 1 1 `shouldBe` Right ("", 1, 2, JsonInteger 5)
+      runParser jsonNumber "42" 1 1 `shouldBe` Right ("", 1, 3, JsonInteger 42)
+      runParser jsonNumber "-7" 1 1 `shouldBe` Right ("", 1, 3, JsonInteger (-7))
+      runParser jsonNumber "-123" 1 1 `shouldBe` Right ("", 1, 5, JsonInteger (-123))
+
+    it "should fail on invalid integers" $ do
+      runParser jsonNumber "01" 1 1 `shouldBe` Left (1, 2, "Unexpected value")
+      runParser jsonNumber "-01" 1 1 `shouldBe` Left (1, 3, "Unexpected value")
+      runParser jsonNumber "00" 1 1 `shouldBe` Left (1, 2, "Unexpected value")
+      runParser jsonNumber "0123" 1 1 `shouldBe` Left (1, 2, "Unexpected value")
+      runParser jsonNumber "-09" 1 1 `shouldBe` Left (1, 3, "Unexpected value")
+
+    it "should parse valid floats" $ do
+      runParser jsonNumber "0.0" 1 1 `shouldBe` Right ("", 1, 4, JsonDouble 0.0)
+      runParser jsonNumber "3.1415" 1 1 `shouldBe` Right ("", 1, 7, JsonDouble 3.1415)
+      runParser jsonNumber "-2.5E+10" 1 1 `shouldBe` Right ("", 1, 9, JsonDouble (-2.5e10))
+      runParser jsonNumber "42.0e-3" 1 1 `shouldBe` Right ("", 1, 8, JsonDouble 4.2e-2)
+      runParser jsonNumber "-7.123e0" 1 1 `shouldBe` Right ("", 1, 9, JsonDouble (-7.123))
+
+    it "should fail on invalid floats" $ do
+      runParser jsonNumber ".5" 1 1 `shouldBe` Left (1, 1, "Expected '0' but got '.' on line 1:1.")
+      runParser jsonNumber "+.25" 1 1 `shouldBe` Left (1, 1, "Expected '0' but got '+' on line 1:1.")

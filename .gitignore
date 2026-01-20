@@ -2,3 +2,4 @@ dist-*
 .vscode/
 .stack-work/
 .ghc*
+NOTES.txt

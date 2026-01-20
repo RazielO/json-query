@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module ParserTest where
 
 import Data.Char (isDigit, isLower)

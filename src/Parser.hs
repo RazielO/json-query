@@ -16,19 +16,21 @@ module Parser
     parseWhitespace,
     symbol,
     between,
-    eof
+    eof,
   )
 where
 
 import Control.Applicative (Alternative (empty, (<|>)))
 import Control.Monad (void)
+import Data.Text (Text)
+import qualified Data.Text as Text (empty, foldl, length, null, span, splitAt, uncons)
 import Text.Printf (printf)
 
 -- | Generic parser type
 newtype Parser a = Parser
   { runParser ::
       -- String to parse
-      String ->
+      Text ->
       -- Line number
       Int ->
       -- Column number
@@ -38,7 +40,7 @@ newtype Parser a = Parser
         -- Error (line, char, error message)
         (Int, Int, String)
         -- Ok (Rest of the string, new line, new column, parsed result)
-        (String, Int, Int, a)
+        (Text, Int, Int, a)
   }
 
 -- Functor of parser
@@ -100,25 +102,26 @@ parseChar ::
   Parser Char
 parseChar chr = Parser runParser'
   where
-    runParser' (chr' : rest) line column
-      | chr == chr' = Right (rest, line, column + 1, chr)
-      | otherwise = Left (line, column, printf "Expected '%c' but got '%c' on line %d:%d." chr chr' line column)
-    runParser' [] line column = Left (line, column, printf "Expected '%c' but got empty string on line %d:%d." chr line column)
+    runParser' input line column = case Text.uncons input of
+      Just (chr', rest)
+        | chr == chr' -> Right (rest, line, column + 1, chr)
+        | otherwise -> Left (line, column, printf "Expected '%c' but got '%c' on line %d:%d." chr chr' line column)
+      Nothing -> Left (line, column, printf "Expected '%c' but got empty string on line %d:%d." chr line column)
 
 -- | Try to parse a string
 parseString ::
   -- | String to try to parse
-  String ->
+  Text ->
   -- | Parser to parse the string
-  Parser String
+  Parser Text
 parseString string = Parser runParser'
   where
     runParser' input line column =
-      let length' = length string
-       in case splitAt length' input of
+      let length' = Text.length string
+       in case Text.splitAt length' input of
             (prefix, rest)
               | string == prefix -> Right (rest, line, column + length', string)
-              | null prefix -> Left (line, column, printf "Expected \"%s\" but got empty string on line %d:%d" string line column)
+              | Text.null prefix -> Left (line, column, printf "Expected \"%s\" but got empty string on line %d:%d" string line column)
               | otherwise -> Left (line, column, printf "Expected \"%s\" but got \"%s\" on line %d:%d" string prefix line column)
 
 -- | Parse a span of elements that match a predicate
@@ -126,11 +129,11 @@ parseSpan ::
   -- | Function that evaluates if a char should be included
   (Char -> Bool) ->
   -- | Parser of the span
-  Parser String
+  Parser Text
 parseSpan predicate =
   Parser $ \input line column ->
-    let (token, rest) = span predicate input
-        (line', column') = foldl update (line, column) token
+    let (token, rest) = Text.span predicate input
+        (line', column') = Text.foldl update (line, column) token
      in Right (rest, line', column', token)
   where
     update :: (Int, Int) -> Char -> (Int, Int)
@@ -160,15 +163,15 @@ notFollowedBy (Parser runParser') = Parser $ \input line col ->
 -- | Parse a character that matches the predicate
 satisfy :: (Char -> Bool) -> Parser Char
 satisfy predicate = Parser $ \input line column ->
-  case input of
-    (chr : cs)
+  case Text.uncons input of
+    Just (chr, cs)
       | predicate chr ->
           let (line', column') = case chr of
                 '\n' -> (line + 1, 1)
                 _ -> (line, column + 1)
            in Right (cs, line', column', chr)
-    (chr : _) -> Left (line, column, printf "Unexpected '%c'" chr)
-    [] -> Left (line, column, "Unexpected end of input")
+    Just (chr, _) -> Left (line, column, printf "Unexpected '%c'" chr)
+    Nothing -> Left (line, column, "Unexpected end of input")
 
 -- | Parse one or more occurrences of `parser` separated by `separator`
 sepBy1 :: Parser a -> Parser sep -> Parser [a]
@@ -191,12 +194,12 @@ lexeme :: Parser a -> Parser a
 lexeme parser = parser <* parseWhitespace
 
 -- | Parse a string that can end with whitespaces
-symbol :: String -> Parser String
+symbol :: Text -> Parser Text
 symbol = lexeme . parseString
 
 -- | Ensure there is no more input (EOF)
 eof :: Parser ()
 eof = Parser $ \input line col ->
-  case input of
-    [] -> Right ([], line, col, ())
-    _  -> Left (line, col, "Expected end of input")
+  case Text.uncons input of
+    Nothing -> Right (Text.empty, line, col, ())
+    _ -> Left (line, col, "Expected end of input")

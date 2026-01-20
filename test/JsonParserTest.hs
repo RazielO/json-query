@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module JsonParserTest where
 
 import qualified Data.Map.Strict as Map

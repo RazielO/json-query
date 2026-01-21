@@ -1,12 +1,14 @@
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module JsonParser (JsonValue (..), jsonBool, jsonNull, jsonNumber, jsonArray, jsonString, jsonObject, json) where
 
 import Control.Applicative (Alternative ((<|>)))
 import Control.Monad (replicateM)
-import Data.Char (chr, isDigit, isHexDigit, ord)
+import Data.Char (chr, isDigit, isHexDigit, ord, toLower)
+import Data.List (intercalate)
 import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map (fromList)
+import qualified Data.Map.Strict as Map (assocs, fromList, null)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text (cons, pack, unpack)
@@ -14,6 +16,7 @@ import qualified Data.Text.Lazy as TextL
 import Data.Text.Lazy.Builder (Builder)
 import qualified Data.Text.Lazy.Builder as Builder (singleton, toLazyText)
 import Parser (Parser (..), between, eof, lexeme, many, notFollowedBy, optional, parseChar, parseWhitespace, satisfy, sepBy, symbol)
+import Text.Printf (printf)
 
 -- | Top-level JSON elements
 data JsonValue
@@ -24,7 +27,39 @@ data JsonValue
   | JsonDouble Double
   | JsonBool Bool
   | JsonNull
-  deriving (Show, Eq)
+  deriving (Eq)
+
+instance Show JsonValue where
+  show = flip show' 0
+    where
+      show' :: JsonValue -> Int -> String
+      show' value n =
+        let indent = replicate (n * 2) ' '
+            showScalar = case value of
+              JsonNull -> "null"
+              JsonBool bool' -> map toLower (show bool')
+              JsonInteger integer -> show integer
+              JsonDouble double -> show double
+              JsonString str -> show str
+              _ -> error "not a scalar"
+         in case value of
+              JsonArray arr
+                | null arr -> "[]"
+                | otherwise ->
+                    let elements = map (\value' -> replicate ((n + 1) * 2) ' ' ++ show' value' (n + 1)) arr
+                     in printf "[\n%s\n%s]" (intercalate ",\n" elements) indent
+              JsonObject obj ->
+                if Map.null obj
+                  then "{}"
+                  else
+                    let pairs =
+                          map
+                            ( \(k, v) ->
+                                replicate ((n + 1) * 2) ' ' ++ show k ++ ": " ++ show' v (n + 1)
+                            )
+                            (Map.assocs obj)
+                     in printf "{\n%s\n%s}" (intercalate ",\n" pairs) indent
+              _ -> showScalar
 
 -- | Parser for a json
 json :: Parser JsonValue

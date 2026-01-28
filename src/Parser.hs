@@ -19,14 +19,25 @@ module Parser
     eof,
     failParser,
     peekChar,
+    Lookahead (..),
+    failExpected,
+    predict,
   )
 where
 
 import Control.Applicative (Alternative (empty, (<|>)))
 import Control.Monad (void)
+import Data.Char (isDigit)
+import Data.List (find, intercalate)
 import Data.Text (Text)
 import qualified Data.Text as Text (empty, foldl, length, null, span, splitAt, uncons)
 import Text.Printf (printf)
+
+-- | Type of lookahead value
+data Lookahead
+  = LAChar Char
+  | LADigit
+  | LAAny
 
 -- | Generic parser type
 newtype Parser a = Parser
@@ -222,3 +233,25 @@ peekChar = Parser $ \input line col ->
   case Text.uncons input of
     Just (chr, _) -> Right (input, line, col, chr)
     Nothing -> Left (line, col, "Unexpected end of input")
+
+-- | Parser that prints an error message based on expected labels
+failExpected :: [String] -> Parser a
+failExpected expected = Parser $ \input line col ->
+  let expected' = intercalate " | " expected
+      errorMsg = case Text.uncons input of
+        Just (chr', _) -> printf "Expected '%s' but got '%c'" expected' chr'
+        Nothing -> printf "Expected %s but reached end of input" expected'
+   in Left (line, col, errorMsg)
+
+-- | Lookahead parser
+predict :: [(Lookahead, Parser a)] -> [String] -> Parser a
+predict table expected = do
+  c <- peekChar
+  case find (\(la, _) -> matches la c) table of
+    Just (_, parser) -> parser
+    Nothing -> failExpected expected
+  where
+    matches :: Lookahead -> Char -> Bool
+    matches (LAChar c) x = c == x
+    matches LADigit x = isDigit x
+    matches LAAny _ = True

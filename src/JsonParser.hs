@@ -27,7 +27,7 @@ import qualified Data.Text as Text (cons, pack, unpack)
 import qualified Data.Text.Lazy as TextL
 import Data.Text.Lazy.Builder (Builder)
 import qualified Data.Text.Lazy.Builder as Builder (singleton, toLazyText)
-import Parser (Parser (..), between, eof, lexeme, many, notFollowedBy, optional, parseChar, parseWhitespace, peekChar, satisfy, sepBy, symbol, failParser)
+import Parser (Lookahead (..), Parser (..), between, eof, failParser, lexeme, many, notFollowedBy, optional, parseChar, parseWhitespace, predict, satisfy, sepBy, symbol)
 import Text.Printf (printf)
 
 -- | Top-level JSON elements
@@ -80,19 +80,18 @@ json = parseWhitespace *> jsonValue <* eof
 -- | Parser for a json value
 jsonValue :: Parser JsonValue
 jsonValue =
-  lexeme $ do
-    chr' <- peekChar
-    case chr' of
-      '{' -> jsonObject
-      '[' -> jsonArray
-      '"' -> jsonString
-      't' -> jsonBool
-      'f' -> jsonBool
-      'n' -> jsonNull
-      '-' -> jsonNumber
-      _
-        | isDigit chr' -> jsonNumber
-        | otherwise -> failParser (printf "Unexpected '%c' while parsing JSON value" chr')
+  lexeme $
+    predict
+      [ (LAChar '{', jsonObject),
+        (LAChar '[', jsonArray),
+        (LAChar '"', jsonString),
+        (LAChar 't', jsonBool),
+        (LAChar 'f', jsonBool),
+        (LAChar 'n', jsonNull),
+        (LAChar '-', jsonNumber),
+        (LADigit, jsonNumber)
+      ]
+      ["object", "array", "string", "number", "true", "false", "null"]
 
 -- | Parser for a json object
 jsonObject :: Parser JsonValue

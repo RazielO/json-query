@@ -9,4 +9,4 @@ main = do
   input <- getContents
   case runParser json (Text.pack input) 1 1 of
     Left (_, _, err) -> putStrLn err
-    Right val -> print val
+    Right (_, _, _, val) -> print val

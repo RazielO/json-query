@@ -14,11 +14,11 @@ jsonNullTest = do
       runParser jsonNull "null" 1 1 `shouldBe` Right ("", 1, 5, JsonNull)
 
     it "should fail on other strings" $ do
-      runParser jsonNull "nall" 1 1 `shouldBe` Left (1, 1, "Expected \"null\" but got \"nall\" on line 1:1")
-      runParser jsonNull "nul" 1 1 `shouldBe` Left (1, 1, "Expected \"null\" but got \"nul\" on line 1:1")
+      runParser jsonNull "nall" 1 1 `shouldBe` Left (1, 1, "Expected \"null\" but got \"nall\" on line 1:1.")
+      runParser jsonNull "nul" 1 1 `shouldBe` Left (1, 1, "Expected \"null\" but got \"nul\" on line 1:1.")
 
     it "should fail on empty string" $ do
-      runParser jsonNull "" 1 1 `shouldBe` Left (1, 1, "Expected \"null\" but got empty string on line 1:1")
+      runParser jsonNull "" 1 1 `shouldBe` Left (1, 1, "Expected \"null\" but got empty string on line 1:1.")
 
 jsonBoolTest :: Spec
 jsonBoolTest = do
@@ -28,11 +28,11 @@ jsonBoolTest = do
       runParser jsonBool "false" 1 1 `shouldBe` Right ("", 1, 6, JsonBool False)
 
     it "should fail on other strings" $ do
-      runParser jsonBool "trua" 1 1 `shouldBe` Left (1, 1, "Expected \"true\" but got \"trua\" on line 1:1")
-      runParser jsonBool "fals" 1 1 `shouldBe` Left (1, 1, "Expected \"true\" but got \"fals\" on line 1:1")
+      runParser jsonBool "trua" 1 1 `shouldBe` Left (1, 1, "Expected \"true\" but got \"trua\" on line 1:1.")
+      runParser jsonBool "fals" 1 1 `shouldBe` Left (1, 1, "Expected \"true\" but got \"fals\" on line 1:1.")
 
     it "should fail on empty string" $ do
-      runParser jsonBool "" 1 1 `shouldBe` Left (1, 1, "Expected \"true\" but got empty string on line 1:1")
+      runParser jsonBool "" 1 1 `shouldBe` Left (1, 1, "Expected \"true\" but got empty string on line 1:1.")
 
 jsonNumberTest :: Spec
 jsonNumberTest = do
@@ -118,11 +118,11 @@ jsonObjectTest = do
         `shouldBe` Right ("", 1, 73, JsonObject (Map.fromList [("age", JsonInteger 22), ("colors", JsonArray [JsonString "red"]), ("drinksCoffee", JsonBool True), ("name", JsonString "John Doe")]))
 
     it "should fail on a missing value" $
-      runParser jsonObject "{\"a\":}" 1 1 `shouldBe` Left (1, 2, "Expected \"}\" but got \"\"\" on line 1:2")
+      runParser jsonObject "{\"a\":}" 1 1 `shouldBe` Left (1, 2, "Expected \"}\" but got \"\"\" on line 1:2.")
 
     it "should fail on unquoted key" $
-      runParser jsonObject "{a:1}" 1 1 `shouldBe` Left (1, 2, "Expected \"}\" but got \"a\" on line 1:2")
+      runParser jsonObject "{a:1}" 1 1 `shouldBe` Left (1, 2, "Expected \"}\" but got \"a\" on line 1:2.")
 
     it "should fail on invalid value" $ do
-      runParser jsonObject "{\"x\":[1,2,]}" 1 1 `shouldBe` Left (1, 2, "Expected \"}\" but got \"\"\" on line 1:2")
-      runParser jsonObject "{\"num\":01}" 1 1 `shouldBe` Left (1, 2, "Expected \"}\" but got \"\"\" on line 1:2")
+      runParser jsonObject "{\"x\":[1,2,]}" 1 1 `shouldBe` Left (1, 2, "Expected \"}\" but got \"\"\" on line 1:2.")
+      runParser jsonObject "{\"num\":01}" 1 1 `shouldBe` Left (1, 2, "Expected \"}\" but got \"\"\" on line 1:2.")

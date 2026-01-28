@@ -17,6 +17,8 @@ module Parser
     symbol,
     between,
     eof,
+    failParser,
+    peekChar,
   )
 where
 
@@ -105,8 +107,11 @@ parseChar chr = Parser runParser'
     runParser' input line column = case Text.uncons input of
       Just (chr', rest)
         | chr == chr' -> Right (rest, line, column + 1, chr)
-        | otherwise -> Left (line, column, printf "Expected '%c' but got '%c' on line %d:%d." chr chr' line column)
-      Nothing -> Left (line, column, printf "Expected '%c' but got empty string on line %d:%d." chr line column)
+        | otherwise -> Left (line, column, errorMessage (printf "'%c'" chr'))
+      Nothing -> Left (line, column, errorMessage "empty string")
+      where
+        errorMessage :: String -> String
+        errorMessage expected = printf "Expected '%c' but got %s on line %d:%d." chr expected line column
 
 -- | Try to parse a string
 parseString ::
@@ -121,8 +126,11 @@ parseString string = Parser runParser'
        in case Text.splitAt length' input of
             (prefix, rest)
               | string == prefix -> Right (rest, line, column + length', string)
-              | Text.null prefix -> Left (line, column, printf "Expected \"%s\" but got empty string on line %d:%d" string line column)
-              | otherwise -> Left (line, column, printf "Expected \"%s\" but got \"%s\" on line %d:%d" string prefix line column)
+              | Text.null prefix -> Left (line, column, errorMessage "empty string")
+              | otherwise -> Left (line, column, errorMessage $ printf "\"%s\"" prefix)
+      where
+        errorMessage :: String -> String
+        errorMessage expected = printf "Expected \"%s\" but got %s on line %d:%d." string expected line column
 
 -- | Parse a span of elements that match a predicate
 parseSpan ::
@@ -203,3 +211,14 @@ eof = Parser $ \input line col ->
   case Text.uncons input of
     Nothing -> Right (Text.empty, line, col, ())
     _ -> Left (line, col, "Expected end of input")
+
+-- | Parser that allows failing
+failParser :: String -> Parser a
+failParser errorMsg = Parser $ \_ line column -> Left (line, column, errorMsg)
+
+-- | Observe the next char (do not consume input)
+peekChar :: Parser Char
+peekChar = Parser $ \input line col ->
+  case Text.uncons input of
+    Just (chr, _) -> Right (input, line, col, chr)
+    Nothing -> Left (line, col, "Unexpected end of input")

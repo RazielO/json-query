@@ -25,13 +25,13 @@ parseStringTest = do
       runParser (parseString "hello") "hello world" 1 1 `shouldBe` Right (" world", 1, 6, "hello")
 
     it "should fail if string doesn't match. Different character." $ do
-      runParser (parseString "hello") "hollo world" 1 1 `shouldBe` Left (1, 1, "Expected \"hello\" but got \"hollo\" on line 1:1")
+      runParser (parseString "hello") "hollo world" 1 1 `shouldBe` Left (1, 1, "Expected \"hello\" but got \"hollo\" on line 1:1.")
 
     it "should fail if string doesn't match. Shorter string." $ do
-      runParser (parseString "hello") "hell world" 1 1 `shouldBe` Left (1, 1, "Expected \"hello\" but got \"hell \" on line 1:1")
+      runParser (parseString "hello") "hell world" 1 1 `shouldBe` Left (1, 1, "Expected \"hello\" but got \"hell \" on line 1:1.")
 
     it "should fail on empty string." $ do
-      runParser (parseString "hello") "" 1 1 `shouldBe` Left (1, 1, "Expected \"hello\" but got empty string on line 1:1")
+      runParser (parseString "hello") "" 1 1 `shouldBe` Left (1, 1, "Expected \"hello\" but got empty string on line 1:1.")
 
 parseSpanTest :: Spec
 parseSpanTest = do

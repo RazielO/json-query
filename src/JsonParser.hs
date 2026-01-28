@@ -1,7 +1,17 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module JsonParser (JsonValue (..), jsonBool, jsonNull, jsonNumber, jsonArray, jsonString, jsonObject, json) where
+module JsonParser
+  ( JsonValue (..),
+    jsonBool,
+    jsonNull,
+    jsonNumber,
+    jsonArray,
+    jsonString,
+    jsonObject,
+    json,
+  )
+where
 
 import Control.Applicative (Alternative ((<|>)))
 import Control.Monad (replicateM)
@@ -10,12 +20,14 @@ import Data.List (intercalate)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map (assocs, fromList, null)
 import Data.Maybe (fromMaybe)
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text (cons, pack, unpack)
 import qualified Data.Text.Lazy as TextL
 import Data.Text.Lazy.Builder (Builder)
 import qualified Data.Text.Lazy.Builder as Builder (singleton, toLazyText)
-import Parser (Parser (..), between, eof, lexeme, many, notFollowedBy, optional, parseChar, parseWhitespace, satisfy, sepBy, symbol)
+import Parser (Parser (..), between, eof, lexeme, many, notFollowedBy, optional, parseChar, parseWhitespace, peekChar, satisfy, sepBy, symbol, failParser)
 import Text.Printf (printf)
 
 -- | Top-level JSON elements
@@ -67,22 +79,54 @@ json = parseWhitespace *> jsonValue <* eof
 
 -- | Parser for a json value
 jsonValue :: Parser JsonValue
-jsonValue = lexeme $ jsonObject <|> jsonArray <|> jsonNumber <|> jsonBool <|> jsonNull <|> jsonString
+jsonValue =
+  lexeme $ do
+    chr' <- peekChar
+    case chr' of
+      '{' -> jsonObject
+      '[' -> jsonArray
+      '"' -> jsonString
+      't' -> jsonBool
+      'f' -> jsonBool
+      'n' -> jsonNull
+      '-' -> jsonNumber
+      _
+        | isDigit chr' -> jsonNumber
+        | otherwise -> failParser (printf "Unexpected '%c' while parsing JSON value" chr')
 
 -- | Parser for a json object
 jsonObject :: Parser JsonValue
-jsonObject = between (symbol "{") (symbol "}") (JsonObject . Map.fromList <$> sepBy parsePair (symbol ","))
+jsonObject = do
+  _ <- symbol "{"
+  pairs <- sepBy parsePair (symbol ",")
+  _ <- symbol "}"
+  case findDuplicateKey pairs of
+    Just k -> failParser ("Duplicate key: \"" <> Text.unpack k <> "\"")
+    Nothing -> pure (JsonObject (Map.fromList pairs))
   where
     parsePair :: Parser (Text, JsonValue)
-    parsePair = (\key _ value -> (key, value)) <$> lexeme stringLiteral <*> symbol ":" <*> jsonValue
+    parsePair = do
+      key <- lexeme stringLiteral
+      _ <- symbol ":"
+      val <- jsonValue
+      pure (key, val)
+
+    findDuplicateKey :: [(Text, JsonValue)] -> Maybe Text
+    findDuplicateKey pairs = go pairs Set.empty
+      where
+        go :: [(Text, JsonValue)] -> Set Text -> Maybe Text
+        go [] _ = Nothing
+        go ((k, _) : xs) seen
+          | Set.member k seen = Just k
+          | otherwise = go xs (Set.insert k seen)
 
 -- | Parser for a json array
 jsonArray :: Parser JsonValue
-jsonArray = between (symbol "[") (symbol "]") arrayElements
-  where
-    -- Parse comma-separated json values
-    arrayElements :: Parser JsonValue
-    arrayElements = JsonArray <$> sepBy jsonValue (symbol ",")
+jsonArray = do
+  _ <- symbol "["
+  values <- sepBy jsonValue (symbol ",")
+  _ <- symbol "]"
+  pure (JsonArray values)
 
 -- | Parser for a null value
 jsonNull :: Parser JsonValue

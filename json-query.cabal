@@ -59,7 +59,9 @@ library
     import:           warnings
 
     -- Modules exported by the library.
-    exposed-modules:  JsonParser, Parser
+    exposed-modules:  JsonParser
+                    , Parser
+                    , JsonValue
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -71,6 +73,9 @@ library
     build-depends:    base ^>=4.21.0.0
                     , containers
                     , text
+                    , prettyprinter
+                    , prettyprinter-ansi-terminal
+                    , scientific
     -- Directories containing source files.
     hs-source-dirs:   src
 
@@ -92,9 +97,11 @@ executable json-query
 
     -- Other library packages from which modules are imported.
     build-depends:
-        base ^>=4.21.0.0,
-        text,
-        json-query
+        base ^>=4.21.0.0
+        , text
+        , json-query
+        , prettyprinter
+        , prettyprinter-ansi-terminal
 
     -- Directories containing source files.
     hs-source-dirs:   app

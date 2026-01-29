@@ -1,4 +1,3 @@
-{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module JsonParser
@@ -15,11 +14,9 @@ where
 
 import Control.Applicative (Alternative ((<|>)))
 import Control.Monad (replicateM)
-import Data.Char (chr, isDigit, isHexDigit, ord, toLower)
-import Data.List (intercalate)
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map (assocs, fromList, null)
+import Data.Char (chr, isDigit, isHexDigit, ord)
 import Data.Maybe (fromMaybe)
+import Data.Scientific (Scientific)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (Text)
@@ -27,51 +24,8 @@ import qualified Data.Text as Text (cons, pack, unpack)
 import qualified Data.Text.Lazy as TextL
 import Data.Text.Lazy.Builder (Builder)
 import qualified Data.Text.Lazy.Builder as Builder (singleton, toLazyText)
+import JsonValue (JsonValue (..))
 import Parser (Lookahead (..), Parser (..), between, eof, failParser, lexeme, many, notFollowedBy, optional, parseChar, parseWhitespace, predict, satisfy, sepBy, symbol)
-import Text.Printf (printf)
-
--- | Top-level JSON elements
-data JsonValue
-  = JsonObject (Map Text JsonValue)
-  | JsonArray [JsonValue]
-  | JsonString Text
-  | JsonInteger Integer
-  | JsonDouble Double
-  | JsonBool Bool
-  | JsonNull
-  deriving (Eq)
-
-instance Show JsonValue where
-  show = flip show' 0
-    where
-      show' :: JsonValue -> Int -> String
-      show' value n =
-        let indent = replicate (n * 2) ' '
-            showScalar = case value of
-              JsonNull -> "null"
-              JsonBool bool' -> map toLower (show bool')
-              JsonInteger integer -> show integer
-              JsonDouble double -> show double
-              JsonString str -> show str
-              _ -> error "not a scalar"
-         in case value of
-              JsonArray arr
-                | null arr -> "[]"
-                | otherwise ->
-                    let elements = map (\value' -> replicate ((n + 1) * 2) ' ' ++ show' value' (n + 1)) arr
-                     in printf "[\n%s\n%s]" (intercalate ",\n" elements) indent
-              JsonObject obj ->
-                if Map.null obj
-                  then "{}"
-                  else
-                    let pairs =
-                          map
-                            ( \(k, v) ->
-                                replicate ((n + 1) * 2) ' ' ++ show k ++ ": " ++ show' v (n + 1)
-                            )
-                            (Map.assocs obj)
-                     in printf "{\n%s\n%s}" (intercalate ",\n" pairs) indent
-              _ -> showScalar
 
 -- | Parser for a json
 json :: Parser JsonValue
@@ -101,7 +55,7 @@ jsonObject = do
   _ <- symbol "}"
   case findDuplicateKey pairs of
     Just k -> failParser ("Duplicate key: \"" <> Text.unpack k <> "\"")
-    Nothing -> pure (JsonObject (Map.fromList pairs))
+    Nothing -> pure (Object pairs)
   where
     parsePair :: Parser (Text, JsonValue)
     parsePair = do
@@ -125,28 +79,28 @@ jsonArray = do
   _ <- symbol "["
   values <- sepBy jsonValue (symbol ",")
   _ <- symbol "]"
-  pure (JsonArray values)
+  pure (Array values)
 
 -- | Parser for a null value
 jsonNull :: Parser JsonValue
-jsonNull = JsonNull <$ symbol "null"
+jsonNull = Null <$ symbol "null"
 
 -- | Parser for a boolean value
 jsonBool :: Parser JsonValue
 jsonBool = boolTrue <|> boolFalse
   where
     boolTrue :: Parser JsonValue
-    boolTrue = JsonBool True <$ symbol "true"
+    boolTrue = Boolean True <$ symbol "true"
 
     boolFalse :: Parser JsonValue
-    boolFalse = JsonBool False <$ symbol "false"
+    boolFalse = Boolean False <$ symbol "false"
 
 -- | Parser for a number value
 jsonNumber :: Parser JsonValue
-jsonNumber = (JsonDouble <$> parseDouble) <|> (JsonInteger <$> parseInteger)
+jsonNumber = (Number <$> parseDouble) <|> (Number <$> parseInteger)
   where
     -- Parse a double number
-    parseDouble :: Parser Double
+    parseDouble :: Parser Scientific
     parseDouble = read . Text.unpack <$> parseDoubleText
       where
         parseDoubleText :: Parser Text
@@ -165,7 +119,7 @@ jsonNumber = (JsonDouble <$> parseDouble) <|> (JsonInteger <$> parseInteger)
           pure (Text.pack [e, sign] <> ds)
 
     -- Parse an integer number
-    parseInteger :: Parser Integer
+    parseInteger :: Parser Scientific
     parseInteger = read . Text.unpack <$> parseInteger'
 
     -- Parse an integer as a string
@@ -199,7 +153,7 @@ jsonNumber = (JsonDouble <$> parseDouble) <|> (JsonInteger <$> parseInteger)
 
 -- | Parser for a json string
 jsonString :: Parser JsonValue
-jsonString = JsonString <$> stringLiteral
+jsonString = Str <$> stringLiteral
 
 -- | Parser for a json string literal
 stringLiteral :: Parser Text

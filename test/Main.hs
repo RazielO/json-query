@@ -9,10 +9,10 @@ import JsonParserTest
     jsonStringTest,
   )
 import ParserTest
-  ( manyTest,
+  ( charTest,
+    manyTest,
     notFollowedByTest,
     optionalTest,
-    parseCharTest,
     parseSpanTest,
     parseStringTest,
     satisfyTest,
@@ -20,12 +20,18 @@ import ParserTest
     sepByTest,
     someTest,
   )
+import QueryEvalTest
+  ( evalIdentityTest,
+  )
+import QueryParserTest
+  ( identityParseTest,
+  )
 import Test.Hspec (hspec)
 
 main :: IO ()
 main = hspec $ do
   -- parser tests
-  parseCharTest
+  charTest
   parseStringTest
   parseSpanTest
   manyTest
@@ -42,3 +48,7 @@ main = hspec $ do
   jsonArrayTest
   jsonStringTest
   jsonObjectTest
+  -- query parser test
+  identityParseTest
+  -- eval query test
+  evalIdentityTest

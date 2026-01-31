@@ -1,36 +1,38 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module JsonValue
-  ( JsonValue (..),
+module Json.AST
+  ( Json (..),
     prettyDisplay,
+    name
   )
 where
 
 import Data.Char (toLower)
+import Data.HashMap.Strict (HashMap)
 import Data.List (intercalate)
 import Data.Scientific (FPFormat (Generic), Scientific, formatScientific, isInteger)
 import Data.Text (Text)
 import qualified Data.Text as Text (concat)
-import Prettyprinter (Doc, Pretty (pretty), annotate, comma, enclose, indent, lbrace, lbracket, punctuate, rbrace, rbracket, vsep, (<+>))
+import Prettyprinter (Doc, Pretty (pretty), annotate, comma, enclose, indent, lbrace, lbracket, punctuate, rbrace, rbracket, vsep, (<+>), line)
 import Prettyprinter.Render.Terminal (AnsiStyle, Color (..), bold, color, colorDull)
 import Text.Printf (printf)
 
 -- | Top-level JSON elements
-data JsonValue
-  = Object [(Text, JsonValue)]
-  | Array [JsonValue]
+data Json
+  = Object {objectList :: [(Text, Json)], objectMap :: HashMap Text Json}
+  | Array [Json]
   | Str Text
   | Number Scientific
   | Boolean Bool
   | Null
   deriving (Eq)
 
-instance Show JsonValue where
-  show :: JsonValue -> String
+instance Show Json where
+  show :: Json -> String
   show = flip show' 0
     where
-      show' :: JsonValue -> Int -> String
+      show' :: Json -> Int -> String
       show' value n =
         let indentation = replicate (n * 2) ' '
             showScalar = case value of
@@ -47,7 +49,7 @@ instance Show JsonValue where
                 | otherwise ->
                     let elements = map (\value' -> replicate ((n + 1) * 2) ' ' ++ show' value' (n + 1)) arr
                      in printf "[\n%s\n%s]" (intercalate ",\n" elements) indentation
-              Object obj ->
+              Object obj _ ->
                 if null obj
                   then "{}"
                   else
@@ -60,8 +62,8 @@ instance Show JsonValue where
                      in printf "{\n%s\n%s}" (intercalate ",\n" pairs) indentation
               _ -> showScalar
 
-prettyDisplay :: JsonValue -> Doc AnsiStyle
-prettyDisplay value = prettyDisplay' value 1
+prettyDisplay :: Json -> Doc AnsiStyle
+prettyDisplay value = prettyDisplay' value 1 <> line
 
 boldBlue :: AnsiStyle
 boldBlue = color Blue <> bold
@@ -69,7 +71,7 @@ boldBlue = color Blue <> bold
 comma' :: Doc AnsiStyle
 comma' = annotate boldBlue comma
 
-prettyDisplay' :: JsonValue -> Int -> Doc AnsiStyle
+prettyDisplay' :: Json -> Int -> Doc AnsiStyle
 prettyDisplay' Null _ = annotate (colorDull Black) "null"
 prettyDisplay' (Boolean value) _ = annotate (color White) (pretty $ map toLower (show value))
 prettyDisplay' (Number value) _ =
@@ -84,10 +86,18 @@ prettyDisplay' (Array values) level =
    in case values of
         [] -> start <> end
         _ -> vsep [start, indent 2 (vsep elements), end]
-prettyDisplay' (Object object) level =
+prettyDisplay' (Object object _) level =
   let start = annotate (color Blue <> bold) lbrace
       end = annotate (color Blue <> bold) rbrace
       elems = punctuate comma (map (\(k, v) -> annotate boldBlue (enclose "\"" "\":" (pretty k)) <+> prettyDisplay' v (level + 1)) object)
    in case object of
         [] -> start <> end
         _ -> vsep [start, indent 2 (vsep elems), end]
+
+name :: Json -> String
+name (Object _ _) = "an object"
+name (Array _) = "an array"
+name (Str _) = "a string"
+name (Number _) = "a number"
+name (Boolean _) = "a boolean"
+name Null = "null"

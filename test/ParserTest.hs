@@ -3,20 +3,20 @@
 module ParserTest where
 
 import Data.Char (isDigit, isLower)
-import Parser (Parser (..), many, notFollowedBy, optional, parseChar, parseSpan, parseString, satisfy, sepBy, sepBy1, some)
+import Parser (Parser (..), many, notFollowedBy, optional, char, parseSpan, parseString, satisfy, sepBy, sepBy1, some)
 import Test.Hspec
 
-parseCharTest :: Spec
-parseCharTest = do
-  describe "parseChar Test" $ do
+charTest :: Spec
+charTest = do
+  describe "char Test" $ do
     it "should parse a character" $ do
-      runParser (parseChar 'a') "a" 1 1 `shouldBe` Right ("", 1, 2, 'a')
+      runParser (char 'a') "a" 1 1 `shouldBe` Right ("", 1, 2, 'a')
 
     it "should fail if character is different" $ do
-      runParser (parseChar 'a') "b" 1 1 `shouldBe` Left (1, 1, "Expected 'a' but got 'b' on line 1:1.")
+      runParser (char 'a') "b" 1 1 `shouldBe` Left (1, 1, "Expected 'a' but got 'b' on line 1:1.")
 
     it "should fail on empty string" $ do
-      runParser (parseChar 'a') "" 1 1 `shouldBe` Left (1, 1, "Expected 'a' but got empty string on line 1:1.")
+      runParser (char 'a') "" 1 1 `shouldBe` Left (1, 1, "Expected 'a' but got empty string on line 1:1.")
 
 parseStringTest :: Spec
 parseStringTest = do
@@ -76,19 +76,19 @@ optionalTest :: Spec
 optionalTest = do
   describe "optional test" $ do
     it "should parse an existing character" $
-      runParser (optional $ parseChar 'a') "abc" 1 1 `shouldBe` Right ("bc", 1, 2, Just 'a')
+      runParser (optional $ char 'a') "abc" 1 1 `shouldBe` Right ("bc", 1, 2, Just 'a')
 
     it "should return Nothing on a non-existing character" $
-      runParser (optional $ parseChar 'a') "bbc" 1 1 `shouldBe` Right ("bbc", 1, 1, Nothing)
+      runParser (optional $ char 'a') "bbc" 1 1 `shouldBe` Right ("bbc", 1, 1, Nothing)
 
 notFollowedByTest :: Spec
 notFollowedByTest = do
   describe "notFollowedBy test" $ do
     it "should fail on a successful parse" $
-      runParser (notFollowedBy $ parseChar 'a') "abc" 1 1 `shouldBe` Left (1, 1, "Unexpected value")
+      runParser (notFollowedBy $ char 'a') "abc" 1 1 `shouldBe` Left (1, 1, "Unexpected value")
 
     it "should pass on a failed parse" $
-      runParser (notFollowedBy $ parseChar 'a') "bbc" 1 1 `shouldBe` Right ("bbc", 1, 1, ())
+      runParser (notFollowedBy $ char 'a') "bbc" 1 1 `shouldBe` Right ("bbc", 1, 1, ())
 
 satisfyTest :: Spec
 satisfyTest = do
@@ -100,16 +100,16 @@ sepByTest :: Spec
 sepByTest = do
   describe "sepBy test" $ do
     it "should parse a comma-separated list of numbers" $
-      runParser (sepBy (satisfy isDigit) (parseChar ',')) "1,2,3,4" 1 1 `shouldBe` Right ("", 1, 8, ['1', '2', '3', '4'])
+      runParser (sepBy (satisfy isDigit) (char ',')) "1,2,3,4" 1 1 `shouldBe` Right ("", 1, 8, ['1', '2', '3', '4'])
 
     it "should not fail if it doesn't parse" $
-      runParser (sepBy (satisfy isDigit) (parseChar ',')) ",2,3,4" 1 1 `shouldBe` Right (",2,3,4", 1, 1, "")
+      runParser (sepBy (satisfy isDigit) (char ',')) ",2,3,4" 1 1 `shouldBe` Right (",2,3,4", 1, 1, "")
 
 sepBy1Test :: Spec
 sepBy1Test = do
   describe "sepBy1 test" $ do
     it "should parse a comma-separated list of numbers" $
-      runParser (sepBy1 (satisfy isDigit) (parseChar ',')) "1,2,3,4" 1 1 `shouldBe` Right ("", 1, 8, ['1', '2', '3', '4'])
+      runParser (sepBy1 (satisfy isDigit) (char ',')) "1,2,3,4" 1 1 `shouldBe` Right ("", 1, 8, ['1', '2', '3', '4'])
 
     it "should fail if it doesn't parse" $
-      runParser (sepBy1 (satisfy isDigit) (parseChar ',')) ",2,3,4" 1 1 `shouldBe` Left (1, 1, "Unexpected ','")
+      runParser (sepBy1 (satisfy isDigit) (char ',')) ",2,3,4" 1 1 `shouldBe` Left (1, 1, "Unexpected ','")

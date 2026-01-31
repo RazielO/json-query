@@ -2,7 +2,7 @@
 
 module Parser
   ( Parser (..),
-    parseChar,
+    char,
     parseString,
     parseSpan,
     many,
@@ -60,8 +60,8 @@ newtype Parser a = Parser
 instance Functor Parser where
   fmap :: (a -> b) -> Parser a -> Parser b
   fmap f (Parser runParser') =
-    Parser $ \input line char -> do
-      (input', line', column', rest) <- runParser' input line char
+    Parser $ \input line chr -> do
+      (input', line', column', rest) <- runParser' input line chr
       Right (input', line', column', f rest)
 
 -- Application of parser's functor
@@ -108,12 +108,12 @@ instance Monad Parser where
       Right (input', line', column', rest) -> runParser (f rest) input' line' column'
 
 -- | Try to parse a character
-parseChar ::
+char ::
   -- | Character to try to parse
   Char ->
   -- | Parser to parse the character
   Parser Char
-parseChar chr = Parser runParser'
+char chr = Parser runParser'
   where
     runParser' input line column = case Text.uncons input of
       Just (chr', rest)

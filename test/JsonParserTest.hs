@@ -2,10 +2,10 @@
 
 module JsonParserTest where
 
-import JsonParser (jsonArray, jsonBool, jsonNull, jsonNumber, jsonObject, jsonString)
-import JsonValue (JsonValue (..))
+import Json.Parser (jsonArray, jsonBool, jsonNull, jsonNumber, jsonObject, jsonString)
+import Json.AST (Json (..))
 import Parser (Parser (..))
-import Test.Hspec (Spec, describe, it, shouldBe)
+import Test.Hspec (Spec, describe, expectationFailure, it, shouldBe)
 
 jsonNullTest :: Spec
 jsonNullTest = do
@@ -111,11 +111,16 @@ jsonObjectTest :: Spec
 jsonObjectTest = do
   describe "jsonObject test" $ do
     it "should parse an empty object" $
-      runParser jsonObject "{}" 1 1 `shouldBe` Right ("", 1, 3, Object [])
+      case runParser jsonObject "{}" 1 1 of
+        Left (_, _, msg) -> expectationFailure $ "Error while parsing the object: " ++ msg
+        Right ("", 1, 3, Object list' _) -> list' `shouldBe` []
+        _ -> expectationFailure "Incorrect object parsing"
 
     it "should parse a JSON object" $
-      runParser jsonObject "{\"name\":\"John Doe\", \"age\": 22, \"drinksCoffee\": true, \"colors\" : [\"red\"]}" 1 1
-        `shouldBe` Right ("", 1, 73, Object [("name", Str "John Doe"), ("age", Number 22), ("drinksCoffee", Boolean True), ("colors", Array [Str "red"])])
+      case runParser jsonObject "{\"name\":\"John Doe\", \"age\": 22, \"drinksCoffee\": true, \"colors\" : [\"red\"]}" 1 1 of
+        Left (_, _, msg) -> expectationFailure $ "Error while parsing the object: " ++ msg
+        Right ("", 1, 73, Object list' _) -> list' `shouldBe` [("name", Str "John Doe"), ("age", Number 22), ("drinksCoffee", Boolean True), ("colors", Array [Str "red"])]
+        _ -> expectationFailure "Incorrect object parsing"
 
     it "should fail on a missing value" $
       runParser jsonObject "{\"a\":}" 1 1 `shouldBe` Left (1, 2, "Expected \"}\" but got \"\"\" on line 1:2.")

@@ -13,8 +13,8 @@ import ParserTest
     manyTest,
     notFollowedByTest,
     optionalTest,
-    parseSpanTest,
-    parseStringTest,
+    spanPTest,
+    stringTest,
     satisfyTest,
     sepBy1Test,
     sepByTest,
@@ -32,8 +32,8 @@ main :: IO ()
 main = hspec $ do
   -- parser tests
   charTest
-  parseStringTest
-  parseSpanTest
+  stringTest
+  spanPTest
   manyTest
   someTest
   optionalTest

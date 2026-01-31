@@ -3,8 +3,8 @@
 module Parser
   ( Parser (..),
     char,
-    parseString,
-    parseSpan,
+    string,
+    spanP,
     many,
     some,
     optional,
@@ -125,31 +125,31 @@ char chr = Parser runParser'
         errorMessage expected = printf "Expected '%c' but got %s on line %d:%d." chr expected line column
 
 -- | Try to parse a string
-parseString ::
+string ::
   -- | String to try to parse
   Text ->
   -- | Parser to parse the string
   Parser Text
-parseString string = Parser runParser'
+string str = Parser runParser'
   where
     runParser' input line column =
-      let length' = Text.length string
+      let length' = Text.length str
        in case Text.splitAt length' input of
             (prefix, rest)
-              | string == prefix -> Right (rest, line, column + length', string)
+              | str == prefix -> Right (rest, line, column + length', str)
               | Text.null prefix -> Left (line, column, errorMessage "empty string")
               | otherwise -> Left (line, column, errorMessage $ printf "\"%s\"" prefix)
       where
         errorMessage :: String -> String
-        errorMessage expected = printf "Expected \"%s\" but got %s on line %d:%d." string expected line column
+        errorMessage expected = printf "Expected \"%s\" but got %s on line %d:%d." str expected line column
 
 -- | Parse a span of elements that match a predicate
-parseSpan ::
+spanP ::
   -- | Function that evaluates if a char should be included
   (Char -> Bool) ->
   -- | Parser of the span
   Parser Text
-parseSpan predicate =
+spanP predicate =
   Parser $ \input line column ->
     let (token, rest) = Text.span predicate input
         (line', column') = Text.foldl update (line, column) token
@@ -214,7 +214,7 @@ lexeme parser = parser <* parseWhitespace
 
 -- | Parse a string that can end with whitespaces
 symbol :: Text -> Parser Text
-symbol = lexeme . parseString
+symbol = lexeme . string
 
 -- | Ensure there is no more input (EOF)
 eof :: Parser ()

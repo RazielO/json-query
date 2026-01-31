@@ -3,7 +3,7 @@
 module ParserTest where
 
 import Data.Char (isDigit, isLower)
-import Parser (Parser (..), many, notFollowedBy, optional, char, parseSpan, parseString, satisfy, sepBy, sepBy1, some)
+import Parser (Parser (..), many, notFollowedBy, optional, char, spanP, string, satisfy, sepBy, sepBy1, some)
 import Test.Hspec
 
 charTest :: Spec
@@ -18,35 +18,35 @@ charTest = do
     it "should fail on empty string" $ do
       runParser (char 'a') "" 1 1 `shouldBe` Left (1, 1, "Expected 'a' but got empty string on line 1:1.")
 
-parseStringTest :: Spec
-parseStringTest = do
-  describe "parseString Test" $ do
+stringTest :: Spec
+stringTest = do
+  describe "string Test" $ do
     it "should parse a string" $ do
-      runParser (parseString "hello") "hello world" 1 1 `shouldBe` Right (" world", 1, 6, "hello")
+      runParser (string "hello") "hello world" 1 1 `shouldBe` Right (" world", 1, 6, "hello")
 
     it "should fail if string doesn't match. Different character." $ do
-      runParser (parseString "hello") "hollo world" 1 1 `shouldBe` Left (1, 1, "Expected \"hello\" but got \"hollo\" on line 1:1.")
+      runParser (string "hello") "hollo world" 1 1 `shouldBe` Left (1, 1, "Expected \"hello\" but got \"hollo\" on line 1:1.")
 
     it "should fail if string doesn't match. Shorter string." $ do
-      runParser (parseString "hello") "hell world" 1 1 `shouldBe` Left (1, 1, "Expected \"hello\" but got \"hell \" on line 1:1.")
+      runParser (string "hello") "hell world" 1 1 `shouldBe` Left (1, 1, "Expected \"hello\" but got \"hell \" on line 1:1.")
 
     it "should fail on empty string." $ do
-      runParser (parseString "hello") "" 1 1 `shouldBe` Left (1, 1, "Expected \"hello\" but got empty string on line 1:1.")
+      runParser (string "hello") "" 1 1 `shouldBe` Left (1, 1, "Expected \"hello\" but got empty string on line 1:1.")
 
-parseSpanTest :: Spec
-parseSpanTest = do
-  describe "parseSpan Test" $ do
-    it "should parse a span of numbers" $
-      runParser (parseSpan isDigit) "123 abc" 1 1 `shouldBe` Right (" abc", 1, 4, "123")
+spanPTest :: Spec
+spanPTest = do
+  describe "spanP Test" $ do
+    it "should parse a spanP of numbers" $
+      runParser (spanP isDigit) "123 abc" 1 1 `shouldBe` Right (" abc", 1, 4, "123")
 
-    it "should parse a span of lowercase letters" $
-      runParser (parseSpan isLower) "abc 123" 1 1 `shouldBe` Right (" 123", 1, 4, "abc")
+    it "should parse a spanP of lowercase letters" $
+      runParser (spanP isLower) "abc 123" 1 1 `shouldBe` Right (" 123", 1, 4, "abc")
 
     it "should return an empty string if nothing matches" $
-      runParser (parseSpan isDigit) "abc 123" 1 1 `shouldBe` Right ("abc 123", 1, 1, "")
+      runParser (spanP isDigit) "abc 123" 1 1 `shouldBe` Right ("abc 123", 1, 1, "")
 
     it "should return an empty string on empty string" $
-      runParser (parseSpan isDigit) "" 1 1 `shouldBe` Right ("", 1, 1, "")
+      runParser (spanP isDigit) "" 1 1 `shouldBe` Right ("", 1, 1, "")
 
 manyTest :: Spec
 manyTest = do

@@ -65,6 +65,7 @@ library
                     , Query.AST
                     , Query.Eval
                     , Query.Parser
+                    , Common.Parser
 
     -- Modules included in this library but not exported.
     -- other-modules:

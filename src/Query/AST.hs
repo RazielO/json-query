@@ -7,7 +7,7 @@ import Data.Text (Text)
 
 data Query
   = Identity
-  | Iterator
+  | Iterator {isOptional :: Bool}
   | ObjectIndex {key :: Text, isOptional :: Bool}
   | ArrayIndex {index :: Int, isOptional :: Bool}
   | Pipe {lhs :: Query, rhs :: Query}

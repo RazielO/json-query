@@ -1,14 +1,27 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module ParserTest where
+module ParserTest (parserTests) where
 
 import Data.Char (isDigit, isLower)
 import Parser (Parser (..), many, notFollowedBy, optional, char, spanP, string, satisfy, sepBy, sepBy1, some)
 import Test.Hspec
 
+parserTests :: Spec
+parserTests = do
+  charTest
+  stringTest
+  spanPTest
+  manyTest
+  someTest
+  optionalTest
+  notFollowedByTest
+  satisfyTest
+  sepByTest
+  sepBy1Test
+
 charTest :: Spec
 charTest = do
-  describe "char Test" $ do
+  describe "Parser. Parser `char`" $ do
     it "should parse a character" $ do
       runParser (char 'a') "a" 1 1 `shouldBe` Right ("", 1, 2, 'a')
 
@@ -20,7 +33,7 @@ charTest = do
 
 stringTest :: Spec
 stringTest = do
-  describe "string Test" $ do
+  describe "Parser. Parser `string`" $ do
     it "should parse a string" $ do
       runParser (string "hello") "hello world" 1 1 `shouldBe` Right (" world", 1, 6, "hello")
 
@@ -35,7 +48,7 @@ stringTest = do
 
 spanPTest :: Spec
 spanPTest = do
-  describe "spanP Test" $ do
+  describe "Parser. Parser `spanP`" $ do
     it "should parse a spanP of numbers" $
       runParser (spanP isDigit) "123 abc" 1 1 `shouldBe` Right (" abc", 1, 4, "123")
 
@@ -50,7 +63,7 @@ spanPTest = do
 
 manyTest :: Spec
 manyTest = do
-  describe "many test" $ do
+  describe "Parser. Parser `many`" $ do
     it "should parse numbers" $
       runParser (many $ satisfy isDigit) "123 abc" 1 1 `shouldBe` Right (" abc", 1, 4, "123")
 
@@ -62,7 +75,7 @@ manyTest = do
 
 someTest :: Spec
 someTest = do
-  describe "some test" $ do
+  describe "Parser. Parser `some`" $ do
     it "should parse numbers" $
       runParser (some $ satisfy isDigit) "123 abc" 1 1 `shouldBe` Right (" abc", 1, 4, "123")
 
@@ -74,7 +87,7 @@ someTest = do
 
 optionalTest :: Spec
 optionalTest = do
-  describe "optional test" $ do
+  describe "Parser. Parser `optional`" $ do
     it "should parse an existing character" $
       runParser (optional $ char 'a') "abc" 1 1 `shouldBe` Right ("bc", 1, 2, Just 'a')
 
@@ -83,7 +96,7 @@ optionalTest = do
 
 notFollowedByTest :: Spec
 notFollowedByTest = do
-  describe "notFollowedBy test" $ do
+  describe "Parser. Parser `notFollowedBy`" $ do
     it "should fail on a successful parse" $
       runParser (notFollowedBy $ char 'a') "abc" 1 1 `shouldBe` Left (1, 1, "Unexpected value")
 
@@ -92,13 +105,13 @@ notFollowedByTest = do
 
 satisfyTest :: Spec
 satisfyTest = do
-  describe "satisfy test" $
+  describe "Parser. Parser `satisfy`" $
     it "should parse a digit" $ do
       runParser (satisfy isDigit) "1" 1 1 `shouldBe` Right ("", 1, 2, '1')
 
 sepByTest :: Spec
 sepByTest = do
-  describe "sepBy test" $ do
+  describe "Parser. Parser `sepBy`" $ do
     it "should parse a comma-separated list of numbers" $
       runParser (sepBy (satisfy isDigit) (char ',')) "1,2,3,4" 1 1 `shouldBe` Right ("", 1, 8, ['1', '2', '3', '4'])
 
@@ -107,7 +120,7 @@ sepByTest = do
 
 sepBy1Test :: Spec
 sepBy1Test = do
-  describe "sepBy1 test" $ do
+  describe "Parser. Parser `sepBy1`" $ do
     it "should parse a comma-separated list of numbers" $
       runParser (sepBy1 (satisfy isDigit) (char ',')) "1,2,3,4" 1 1 `shouldBe` Right ("", 1, 8, ['1', '2', '3', '4'])
 

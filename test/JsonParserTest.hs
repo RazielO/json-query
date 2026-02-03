@@ -1,15 +1,24 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module JsonParserTest where
+module JsonParserTest (jsonParserTests) where
 
-import Json.Parser (jsonArray, jsonBool, jsonNull, jsonNumber, jsonObject, jsonString)
 import Json.AST (Json (..))
+import Json.Parser (jsonArray, jsonBool, jsonNull, jsonNumber, jsonObject, jsonString)
 import Parser (Parser (..))
 import Test.Hspec (Spec, describe, expectationFailure, it, shouldBe)
 
+jsonParserTests :: Spec
+jsonParserTests = do
+  jsonNullTest
+  jsonBoolTest
+  jsonNumberTest
+  jsonArrayTest
+  jsonStringTest
+  jsonObjectTest
+
 jsonNullTest :: Spec
 jsonNullTest = do
-  describe "jsonNull Test" $ do
+  describe "JSON.Parser. Parser for JSON null" $ do
     it "should parse a null value" $ do
       runParser jsonNull "null" 1 1 `shouldBe` Right ("", 1, 5, Null)
 
@@ -22,7 +31,7 @@ jsonNullTest = do
 
 jsonBoolTest :: Spec
 jsonBoolTest = do
-  describe "jsonBool Test" $ do
+  describe "JSON.Parser. Parser for JSON boolean" $ do
     it "should parse a bool value" $ do
       runParser jsonBool "true" 1 1 `shouldBe` Right ("", 1, 5, Boolean True)
       runParser jsonBool "false" 1 1 `shouldBe` Right ("", 1, 6, Boolean False)
@@ -36,7 +45,7 @@ jsonBoolTest = do
 
 jsonNumberTest :: Spec
 jsonNumberTest = do
-  describe "jsonNumber Test" $ do
+  describe "JSON.Parser. Parser for JSON number" $ do
     it "should parse valid integers" $ do
       runParser jsonNumber "0" 1 1 `shouldBe` Right ("", 1, 2, Number 0)
       runParser jsonNumber "5" 1 1 `shouldBe` Right ("", 1, 2, Number 5)
@@ -64,7 +73,7 @@ jsonNumberTest = do
 
 jsonArrayTest :: Spec
 jsonArrayTest = do
-  describe "jsonArray test" $ do
+  describe "JSON.Parser. Parser for JSON array" $ do
     it "should parse an empty array" $
       runParser jsonArray "[]" 1 1 `shouldBe` Right ("", 1, 3, Array [])
 
@@ -79,7 +88,7 @@ jsonArrayTest = do
 
 jsonStringTest :: Spec
 jsonStringTest = do
-  describe "jsonString test" $ do
+  describe "JSON.Parser. Parser for JSON string" $ do
     it "should parse an empty string" $
       runParser jsonString "\"\"" 1 1 `shouldBe` Right ("", 1, 3, Str "")
 
@@ -109,7 +118,7 @@ jsonStringTest = do
 
 jsonObjectTest :: Spec
 jsonObjectTest = do
-  describe "jsonObject test" $ do
+  describe "JSON.Parser. Parser for JSON object" $ do
     it "should parse an empty object" $
       case runParser jsonObject "{}" 1 1 of
         Left (_, _, msg) -> expectationFailure $ "Error while parsing the object: " ++ msg

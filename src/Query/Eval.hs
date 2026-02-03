@@ -12,9 +12,12 @@ evalQuery :: Query -> Json -> Either String [Json]
 -- Identity
 evalQuery Identity json' = Right [json']
 -- Iterator
-evalQuery Iterator (Object list' _) = Right (map snd list')
-evalQuery Iterator (Array list') = Right list'
-evalQuery Iterator json' = Left (printf "Cannot iterate over %s" (name json'))
+evalQuery (Iterator _) (Object list' _) = Right (map snd list')
+evalQuery (Iterator _) (Array list') = Right list'
+evalQuery (Iterator isOptional') json' =
+  if isOptional'
+    then Right []
+    else Left (printf "Cannot iterate over %s" (name json'))
 -- Object Index
 evalQuery (ObjectIndex key' _) (Object _ map') =
   case map' !? key' of

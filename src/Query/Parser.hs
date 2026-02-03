@@ -1,12 +1,13 @@
 module Query.Parser
   ( query,
-    identity,
+    dotExpr,
     iterator,
     objectIndex,
     arrayIndex,
     pipe,
     comma,
     slice,
+    postfixExpr
   )
 where
 
@@ -16,7 +17,7 @@ import Data.Char (isAlpha, isAlphaNum, isDigit)
 import Data.Maybe (fromMaybe, isJust)
 import Data.Text (Text)
 import qualified Data.Text as Text (cons, unpack)
-import Parser (Parser, char, eof, failParser, lexeme, optional, parseWhitespace, satisfy, some, spanP)
+import Parser (Parser, chainl1, char, eof, failParser, lexeme, many, optional, parseWhitespace, satisfy, spanP)
 import Query.AST (Query (..))
 import Text.Printf (printf)
 import Text.Read (readMaybe)
@@ -26,32 +27,47 @@ query :: Parser Query
 query = parseWhitespace *> comma <* eof
 
 -- | Operations query parser
-operation :: Parser Query
-operation =
-  group
-    <|> objectIndex
-    <|> slice
+dotExpr :: Parser Query
+dotExpr = do
+  _ <- lexeme (char '.')
+  first <- objectIndex <|> bracketOp <|> identity
+  rest <- many (objectIndex <|> bracketOp)
+  pure (foldl Pipe first rest)
+
+-- | Parser for operations that require brackets
+bracketOp :: Parser Query
+bracketOp =
+  slice
     <|> arrayIndex
     <|> iterator
-    <|> identity
 
--- | Parser for a piped query
+-- | Parser for a comma query
 comma :: Parser Query
-comma = do
-  first <- pipe
-  comma' <- optional (lexeme (char ','))
-  if isJust comma'
-    then Comma first <$> comma
-    else pure first
+comma = chainl1 pipe commaOp
+  where
+    commaOp :: Parser (Query -> Query -> Query)
+    commaOp = Comma <$ (parseWhitespace *> lexeme (char ','))
 
 -- | Parser for a piped query
 pipe :: Parser Query
-pipe = do
-  first <- lexeme operation
-  pipe' <- optional (lexeme (char '|'))
-  if isJust pipe'
-    then Pipe first <$> pipe
-    else pure first
+pipe = chainl1 postfixExpr pipeOp
+  where
+    pipeOp :: Parser (Query -> Query -> Query)
+    pipeOp = Pipe <$ (parseWhitespace *> lexeme (char '|'))
+
+-- | Parser for postfix operations that allow chaining
+-- postfixExpr :: Parser Query
+-- postfixExpr = chainl1 primary (pure Pipe)
+postfixExpr :: Parser Query
+postfixExpr = do
+  first <- primary
+  rest  <- many primary
+  pure (foldl Pipe first rest)
+
+
+-- | Parser for primary values (parentheses or identity)
+primary :: Parser Query
+primary = group <|> dotExpr
 
 -- | Parser for a parentheses-grouped query
 group :: Parser Query
@@ -60,36 +76,21 @@ group =
     *> comma
     <* lexeme (char ')')
 
--- | Convert a list of queries into pipes
-queriesToPipes :: [Query] -> Query
-queriesToPipes [] = Identity
-queriesToPipes [query'] = query'
-queriesToPipes (q : qs) = Pipe q (queriesToPipes qs)
-
 -- | Identity parser
 identity :: Parser Query
-identity = Identity <$ lexeme (char '.')
+identity = pure Identity
 
 -- | Iterator parser
 iterator :: Parser Query
 iterator =
   Iterator
-    <$ lexeme (char '.')
-    <* lexeme (char '[')
+    <$ lexeme (char '[')
     <* lexeme (char ']')
-
--- | Parser for a single or combined object key index
-objectIndex :: Parser Query
-objectIndex = do
-  indices <- some (lexeme objectIndex')
-  case indices of
-    [index'] -> pure index'
-    _ -> pure (queriesToPipes indices)
+    <*> optionalModifier
 
 -- | Parser for a single object key index
-objectIndex' :: Parser Query
-objectIndex' = do
-  _ <- char '.'
+objectIndex :: Parser Query
+objectIndex = do
   lbracket <- optional (char '[')
   if isJust lbracket
     then do
@@ -114,12 +115,12 @@ optionalModifier = isJust <$> optional (lexeme $ char '?')
 -- | Parser for an array index
 arrayIndex :: Parser Query
 arrayIndex = do
-  _ <- char '.'
   _ <- lexeme (char '[')
   index' <- indexParser
   _ <- lexeme (char ']')
   ArrayIndex index' <$> optionalModifier
 
+-- | Parser for an index number
 indexParser :: Parser Int
 indexParser = do
   negative <- optional (char '-')
@@ -132,7 +133,6 @@ indexParser = do
 -- | Parser for a string/array slice
 slice :: Parser Query
 slice = do
-  _ <- char '.'
   _ <- lexeme (char '[')
   start' <- optional indexParser
   _ <- lexeme (char ':')

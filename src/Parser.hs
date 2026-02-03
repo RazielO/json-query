@@ -22,6 +22,7 @@ module Parser
     Lookahead (..),
     failExpected,
     predict,
+    chainl1
   )
 where
 
@@ -255,3 +256,17 @@ predict table expected = do
     matches (LAChar c) x = c == x
     matches LADigit x = isDigit x
     matches LAAny _ = True
+
+-- | left-associative operator parser
+chainl1 :: Parser a -> Parser (a -> a -> a) -> Parser a
+chainl1 parser' op = do
+  x <- parser'
+  rest x
+  where
+    rest left =
+      ( do
+          f <- op
+          right <- parser'
+          rest (f left right)
+      )
+        <|> pure left

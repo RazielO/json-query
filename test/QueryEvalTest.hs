@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module QueryEvalTest where
+module QueryEvalTest (queryEvalTests) where
 
 import Data.Either (fromRight)
 import Json.AST (Json (..))
@@ -10,9 +10,19 @@ import Query.AST (Query (..))
 import Query.Eval (evalQuery)
 import Test.Hspec (Spec, describe, it, shouldBe)
 
+queryEvalTests :: Spec
+queryEvalTests = do
+  evalIdentityTest
+  evalIteratorTest
+  evalObjectIndexTest
+  evalPipeTest
+  evalArrayIndexTest
+  evalCommaTest
+  evalSliceTest
+
 evalIdentityTest :: Spec
 evalIdentityTest = do
-  describe "evalIdentityTest" $ do
+  describe "Query.Eval. Evaluate an identity query" $ do
     it "should return the same json as the input" $ do
       evalQuery Identity Null `shouldBe` Right [Null]
       evalQuery Identity (Number 1) `shouldBe` Right [Number 1]
@@ -20,26 +30,26 @@ evalIdentityTest = do
 
 evalIteratorTest :: Spec
 evalIteratorTest = do
-  describe "evalIteratorTest" $ do
+  describe "Query.Eval. Evaluate an iterator query" $ do
     it "should iterate over an empty array" $ do
       let (_, _, _, json') = fromRight ("", 1, 1, Null) (runParser json "[]" 1 1)
-      evalQuery Iterator json' `shouldBe` Right []
+      evalQuery (Iterator False) json' `shouldBe` Right []
 
     it "should iterate over an array" $ do
       let (_, _, _, json') = fromRight ("", 1, 1, Null) (runParser json "[1,2,null]" 1 1)
-      evalQuery Iterator json' `shouldBe` Right [Number 1, Number 2, Null]
+      evalQuery (Iterator False) json' `shouldBe` Right [Number 1, Number 2, Null]
 
     it "should iterate over an empty object" $ do
       let (_, _, _, json') = fromRight ("", 1, 1, Null) (runParser json "{}" 1 1)
-      evalQuery Iterator json' `shouldBe` Right []
+      evalQuery (Iterator False) json' `shouldBe` Right []
 
     it "should iterate over the values of an object" $ do
       let (_, _, _, json') = fromRight ("", 1, 1, Null) (runParser json "{\"foo\": 1, \"bar\": \"abc\"}" 1 1)
-      evalQuery Iterator json' `shouldBe` Right [Number 1, Str "abc"]
+      evalQuery (Iterator False) json' `shouldBe` Right [Number 1, Str "abc"]
 
 evalObjectIndexTest :: Spec
 evalObjectIndexTest = do
-  describe "evalObjectIndexTest" $ do
+  describe "Query.Eval. Evaluate an object index query" $ do
     it "should return a key if it's on the object" $ do
       let (_, _, _, json') = fromRight ("", 1, 1, Null) (runParser json "{\"foo\": 1, \"bar\": \"abc\"}" 1 1)
       evalQuery (ObjectIndex "foo" False) json' `shouldBe` Right [Number 1]
@@ -59,7 +69,7 @@ evalObjectIndexTest = do
 
 evalPipeTest :: Spec
 evalPipeTest = do
-  describe "evalPipeTest" $ do
+  describe "Query.Eval. Evaluate a pipe query" $ do
     it "should evaluate a pipe of identities" $
       evalQuery (Pipe Identity Identity) (Number 1) `shouldBe` Right [Number 1]
 
@@ -69,7 +79,7 @@ evalPipeTest = do
 
     it "should evaluate a pipe iterator > object key" $ do
       let (_, _, _, json') = fromRight ("", 1, 1, Null) (runParser json "[{\"foo\": 1}, {\"foo\": 2}, {\"foo\": \"abc\"}, {\"bar\": 1}]" 1 1)
-      evalQuery (Pipe Iterator (ObjectIndex "foo" True)) json' `shouldBe` Right [Number 1, Number 2, Str "abc", Null]
+      evalQuery (Pipe (Iterator False) (ObjectIndex "foo" True)) json' `shouldBe` Right [Number 1, Number 2, Str "abc", Null]
 
     it "should fail if any operation is not valid (index a number)" $ do
       let (_, _, _, json') = fromRight ("", 1, 1, Null) (runParser json "{\"foo\": 1}" 1 1)
@@ -77,7 +87,7 @@ evalPipeTest = do
 
 evalArrayIndexTest :: Spec
 evalArrayIndexTest = do
-  describe "evalArrayIndexTest" $ do
+  describe "Query.Eval. Evaluate an array index query" $ do
     it "should correctly evaluate a positive index" $ do
       let (_, _, _, json') = fromRight ("", 1, 1, Null) (runParser json "[1,2,3,4,5]" 1 1)
       evalQuery (ArrayIndex 0 False) json' `shouldBe` Right [Number 1]
@@ -97,14 +107,14 @@ evalArrayIndexTest = do
 
 evalCommaTest :: Spec
 evalCommaTest = do
-  describe "commaEvalTest" $ do
+  describe "Query.Eval. Evaluate a comma query" $ do
     it "should correctly evaluate a simple comma" $ do
       let (_, _, _, json') = fromRight ("", 1, 1, Null) (runParser json "1" 1 1)
       evalQuery (Comma Identity Identity) json' `shouldBe` Right [Number 1, Number 1]
 
     it "should correctly evaluate a comma of different types" $ do
       let (_, _, _, json') = fromRight ("", 1, 1, Null) (runParser json "[1,2,3]" 1 1)
-      evalQuery (Comma Identity Iterator) json' `shouldBe` Right [Array [Number 1, Number 2, Number 3], Number 1, Number 2, Number 3]
+      evalQuery (Comma Identity (Iterator False)) json' `shouldBe` Right [Array [Number 1, Number 2, Number 3], Number 1, Number 2, Number 3]
 
     it "should fail if any of the operations fail" $ do
       let (_, _, _, json') = fromRight ("", 1, 1, Null) (runParser json "[1,2,3]" 1 1)
@@ -112,7 +122,7 @@ evalCommaTest = do
 
 evalSliceTest :: Spec
 evalSliceTest = do
-  describe "sliceEvalTest" $ do
+  describe "Query.Eval. Evaluate a slice query" $ do
     it "should correctly evaluate slice with both indices" $ do
       let (_, _, _, json') = fromRight ("", 1, 1, Null) (runParser json "[1,2,3,4,5]" 1 1)
       evalQuery (Slice {start = Just 1, end = Just (-1)}) json' `shouldBe` Right [Array [Number 2, Number 3, Number 4]]

@@ -2,8 +2,9 @@
 
 module JsonParserTest (jsonParserTests) where
 
+import qualified Data.HashMap.Strict as HM (empty, fromList)
 import Json.AST (Json (..))
-import Json.Parser (jsonArray, jsonBool, jsonNull, jsonNumber, jsonObject, jsonString)
+import Json.Parser (json, jsonArray, jsonBool, jsonNull, jsonNumber, jsonObject, jsonString)
 import Parser (Parser (..))
 import Test.Hspec (Spec, describe, expectationFailure, it, shouldBe)
 
@@ -15,6 +16,7 @@ jsonParserTests = do
   jsonArrayTest
   jsonStringTest
   jsonObjectTest
+  jsonEdgeCasesTest
 
 jsonNullTest :: Spec
 jsonNullTest = do
@@ -52,6 +54,7 @@ jsonNumberTest = do
       runParser jsonNumber "42" 1 1 `shouldBe` Right ("", 1, 3, Number 42)
       runParser jsonNumber "-7" 1 1 `shouldBe` Right ("", 1, 3, Number (-7))
       runParser jsonNumber "-123" 1 1 `shouldBe` Right ("", 1, 5, Number (-123))
+      runParser jsonNumber "1e10" 1 1 `shouldBe` Right ("", 1, 5, Number 1e10)
 
     it "should fail on invalid integers" $ do
       runParser jsonNumber "01" 1 1 `shouldBe` Left (1, 2, "Unexpected value")
@@ -104,6 +107,9 @@ jsonStringTest = do
     it "should parse a string with an escaped hex value" $
       runParser jsonString "\"Unicode: \\u00A9\"" 1 1 `shouldBe` Right ("", 1, 18, Str "Unicode: ©")
 
+    it "should parse a string with a surrogate pair of escaped hex values" $
+      runParser jsonString "\"Unicode: \\uD823\\uDC00\"" 1 1 `shouldBe` Right ("", 1, 24, Str "Unicode: 𘰀")
+
     it "should fail on a missing closing quote" $
       runParser jsonString "\"Unclosed string" 1 1 `shouldBe` Left (1, 17, "Expected '\"' but got empty string on line 1:17.")
 
@@ -140,3 +146,66 @@ jsonObjectTest = do
     it "should fail on invalid value" $ do
       runParser jsonObject "{\"x\":[1,2,]}" 1 1 `shouldBe` Left (1, 2, "Expected \"}\" but got \"\"\" on line 1:2.")
       runParser jsonObject "{\"num\":01}" 1 1 `shouldBe` Left (1, 2, "Expected \"}\" but got \"\"\" on line 1:2.")
+
+jsonEdgeCasesTest :: Spec
+jsonEdgeCasesTest = do
+  describe "JSON.Parser. Test for edge cases" $ do
+    it "should parse an object with empty string as key" $ do
+      let json' =
+            "{ \n\
+            \ \"\": [],\n\
+            \ \"emptyObject\": {},\n\
+            \ \"emptyArray\": [] \n\
+            \ }"
+      let list' = [("", Array []), ("emptyObject", Object [] HM.empty), ("emptyArray", Array [])]
+      runParser json json' 1 1 `shouldBe` Right ("", 5, 3, Object list' (HM.fromList list'))
+
+    it "should parse different kinds of numbers" $ do
+      let json' =
+            "{\n\
+            \  \"small\": 0.0000001,\n\
+            \  \"largeExp\": 6.022e23,\n\
+            \  \"negativeExp\": -2.5E-8,\n\
+            \  \"intWithExp\": 1e3\n\
+            \}"
+      let list' = [("small", Number 0.0000001), ("largeExp", Number 6.022e23), ("negativeExp", Number (-2.5e-8)), ("intWithExp", Number 1000)]
+      runParser json json' 1 1 `shouldBe` Right ("", 6, 2, Object list' (HM.fromList list'))
+
+    it "should parsed escaped characters" $ do
+      let json' =
+            "{\n\
+            \  \"quote\": \"\\\"\",\n\
+            \  \"backslash\": \"\\\\\",\n\
+            \  \"slash\": \"\\/\",\n\
+            \  \"controls\": \"\\b\\f\\n\\r\\t\"\n\
+            \}"
+      let list' = [("quote", Str "\""), ("backslash", Str "\\"), ("slash", Str "/"), ("controls", Str "\b\f\n\r\t")]
+      runParser json json' 1 1 `shouldBe` Right ("", 6, 2, Object list' (HM.fromList list'))
+
+    it "should parsed unicode including surrogate pairs" $ do
+      let json' =
+            "{\n\
+            \ \"basicUnicode\": \"Espa\\u00f1a\",\n\
+            \ \"emoji\": \"\\ud83d\\ude80\",\n\
+            \ \"musicSymbolGclef\": \"\\ud834\\udd1e\"\n\
+            \}"
+      let list' = [("basicUnicode", Str "España"), ("emoji", Str "🚀"), ("musicSymbolGclef", Str "𝄞")]
+      runParser json json' 1 1 `shouldBe` Right ("", 5, 2, Object list' (HM.fromList list'))
+
+    it "should parse nested arrays and objects with arbitrary whitespace" $ do
+      let json' =
+            "{\n\
+            \ \"a\" : [ 1 , { \"b\" : [ null , true , false ] } ]\n\
+            \}"
+      let list' =
+            [ ( "a",
+                Array
+                  [ Number 1,
+                    Object
+                      [("b", Array [Null, Boolean True, Boolean False])]
+                      (HM.fromList [("b", Array [Null, Boolean True, Boolean False])])
+                  ]
+              )
+            ]
+      runParser json json' 1 1
+        `shouldBe` Right ("", 3, 2, Object list' (HM.fromList list'))

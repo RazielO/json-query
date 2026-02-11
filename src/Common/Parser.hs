@@ -8,6 +8,7 @@ where
 
 import Control.Applicative (Alternative ((<|>)))
 import Control.Monad (replicateM)
+import Data.Bits (Bits (shiftL))
 import Data.Char (chr, isDigit, isHexDigit, ord)
 import Data.Maybe (fromMaybe)
 import Data.Scientific (Scientific)
@@ -16,7 +17,7 @@ import qualified Data.Text as Text (concat, cons, pack, unpack)
 import qualified Data.Text.Lazy as TextL
 import Data.Text.Lazy.Builder (Builder)
 import qualified Data.Text.Lazy.Builder as Builder (singleton, toLazyText)
-import Parser (Parser, between, char, many, notFollowedBy, optional, satisfy, string)
+import Parser (Parser, between, char, failParser, many, notFollowedBy, optional, satisfy, string, some)
 
 -- | Parser for a json string literal
 stringLiteral :: Parser Text
@@ -34,7 +35,11 @@ stringLiteral =
     validChar :: Char -> Bool
     validChar chr' =
       let code = ord chr'
-       in code >= 0x0020 && code <= 0x10FFF && chr' /= '"' && chr' /= '\\'
+       in code >= 0x0020
+            && code <= 0x10FFFF
+            && not (isHighSurrogate code || isLowSurrogate code) -- disallow lone surrogates
+            && chr' /= '"'
+            && chr' /= '\\'
 
     -- Parse escape values
     parseEscapeCharacter :: Parser Char
@@ -53,30 +58,50 @@ stringLiteral =
     -- Parse hex value
     parseEscapeHex :: Parser Char
     parseEscapeHex = do
-      _ <- char '\\'
-      _ <- char 'u'
-      digits <- replicateM 4 (satisfy isHexDigit)
-      let code = read ("0x" ++ digits)
-      pure (chr code)
+      _ <- char '\\' *> char 'u'
+      high <- hex4
+      if isHighSurrogate high
+        then do
+          _ <- char '\\' *> char 'u'
+          low <- hex4
+          if isLowSurrogate low
+            then pure (combineSurrogates high low)
+            else failParser "Lone low surrogate in \\u escape"
+        else
+          if isLowSurrogate high
+            then failParser "Lone low surrogate in \\u escape"
+            else pure (chr high)
 
+    -- Parse a 4-digit hexadecimal number
+    hex4 :: Parser Int
+    hex4 = read . ("0x" <>) <$> replicateM 4 (satisfy isHexDigit)
+
+    -- Is the char code the high part of a surrogate pair
+    isHighSurrogate :: Int -> Bool
+    isHighSurrogate x = x >= 0xD800 && x <= 0xDBFF
+
+    -- Is the char code the low part of a surrogate pair
+    isLowSurrogate :: Int -> Bool
+    isLowSurrogate x = x >= 0xDC00 && x <= 0xDFFF
+
+    -- Combine a surrogate pair into a char
+    combineSurrogates :: Int -> Int -> Char
+    combineSurrogates high low = chr $ 0x10000 + ((high - 0xD800) `shiftL` 10) + (low - 0xDC00)
+
+-- | Parse a number
 number :: Parser Scientific
 number = do
   sign <- fromMaybe "" <$> optional (string "-")
-  integerPart' <- parseZero <|> parseNonZero
-  let integerPart = Text.concat [sign, integerPart']
-
-  fractionalPart <- optional $ Text.cons '.' <$> (char '.' *> digits)
-  case fractionalPart of
-    Nothing -> pure (read $ Text.unpack integerPart)
-    Just fraction -> do
-      exponent' <- fromMaybe "" <$> optional fracExponent
-      pure $ read $ Text.unpack (Text.concat [integerPart, fraction, exponent'])
+  intPart <- parseZero <|> parseNonZero
+  fracPart <- fromMaybe "" <$> optional (Text.cons '.' <$> (char '.' *> (Text.pack <$> some digit)))
+  expPart <- fromMaybe "" <$> optional fracExponent
+  pure . read . Text.unpack $ Text.concat [sign, intPart, fracPart, expPart]
   where
     fracExponent :: Parser Text
     fracExponent = do
       e <- char 'e' <|> char 'E'
       sign <- fromMaybe '+' <$> optional (char '-' <|> char '+')
-      ds <- digits
+      ds <- Text.pack <$> some digit
       pure (Text.pack [e, sign] <> ds)
 
     parseZero :: Parser Text

@@ -140,6 +140,7 @@ test-suite json-query-test
 
     -- Test dependencies.
     build-depends:
-        base ^>=4.21.0.0,
-        hspec,
-        json-query
+        base ^>=4.21.0.0
+      , hspec
+      , unordered-containers
+      , json-query

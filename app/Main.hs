@@ -12,11 +12,9 @@ import Query.Eval (evalQuery)
 import Query.Parser (query)
 import System.Environment (getArgs)
 import Text.Printf (printf)
-import Query.Parser (postfixExpr)
 
 main :: IO ()
 main = do
-  print $ runParser postfixExpr ".foo.bar" 1 1
   args <- getArgs
   case args of
     [query'] -> do

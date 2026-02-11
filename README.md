@@ -12,6 +12,8 @@
 
 - Objects, arrays, strings, numbers, booleans, and null.
 - Pretty-printed, syntax-highlighted output in the terminal.
+- Fully [RFC](https://www.rfc-editor.org/rfc/rfc8259) compliant.
+- Duplicate keys are rejected.
 
 ### Query Language
 
